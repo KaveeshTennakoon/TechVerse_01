@@ -20,9 +20,9 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: 'All fields are required' });
     }
 
-    // Check username length
-    if (username.length < 8) {
-      return res.status(400).json({ message: 'Username must be at least 8 characters long' });
+    // Check password length
+    if (password.length < 8) {
+      return res.status(400).json({ message: 'Password must be at least 8 characters long' });
     }
 
     // Check password complexity
@@ -78,4 +78,52 @@ const checkUsername = async (req, res) => {
   }
 };
 
-module.exports = { registerUser, checkUsername };
+// @desc    Login user & get token
+// @route   POST /api/auth/login
+// @access  Public
+const loginUser = async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    // Validation
+    if (!username || !password) {
+      return res.status(400).json({ message: 'All fields are required' });
+    }
+
+    // Find user by username
+    const user = await UserModel.findByUsername(username);
+
+    // Check if user exists
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid username or password' });
+    }
+
+    // Check if password matches
+    const isMatch = await UserModel.comparePassword(password, user.password);
+    
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Invalid username or password' });
+    }
+
+    // Create JWT token
+    const token = generateToken(user.id);
+
+    // Set token in cookie
+    res.cookie('jwt', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+    });
+
+    res.json({
+      id: user.id,
+      username: user.username,
+      token
+    });
+  } catch (error) {
+    console.error(`Error in loginUser: ${error.message}`);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+module.exports = { registerUser, checkUsername, loginUser };
