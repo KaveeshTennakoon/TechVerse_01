@@ -20,9 +20,9 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: 'All fields are required' });
     }
 
-    // Check username length
-    if (username.length < 8) {
-      return res.status(400).json({ message: 'Username must be at least 8 characters long' });
+    // Check password length
+    if (password.length < 8) {
+      return res.status(400).json({ message: 'Password must be at least 8 characters long' });
     }
 
     // Check password complexity
