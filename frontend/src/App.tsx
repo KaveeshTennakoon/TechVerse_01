@@ -1,15 +1,20 @@
 import React, { useState } from 'react';
 import PasswordStrengthBar from 'react-password-strength-bar';
 import { Eye, EyeOff } from 'lucide-react';
+import LandingPage from './LandingPage';
 
 interface FormData {
   username: string;
+  email: string;
+  name: string;
   password: string;
   confirmPassword: string;
 }
 
 interface FormErrors {
   username?: string;
+  email?: string;
+  name?: string;
   password?: string;
   confirmPassword?: string;
   general?: string;
@@ -17,8 +22,12 @@ interface FormErrors {
 
 function App() {
   const [isLogin, setIsLogin] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUser, setCurrentUser] = useState('');
   const [formData, setFormData] = useState<FormData>({
     username: '',
+    email: '',
+    name: '',
     password: '',
     confirmPassword: '',
   });
@@ -27,16 +36,23 @@ function App() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const mockCredentials = {
-    username: 'testuser',
-    password: 'Test123!',
-  };
-
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
 
     if (!formData.username) {
       newErrors.username = 'Username is required';
+    }
+
+    if (!isLogin) {
+      if (!formData.name) {
+        newErrors.name = 'Full name is required';
+      }
+
+      if (!formData.email) {
+        newErrors.email = 'Email is required';
+      } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+        newErrors.email = 'Please enter a valid email address';
+      }
     }
 
     if (!formData.password) {
@@ -58,8 +74,6 @@ function App() {
     return Object.keys(newErrors).length === 0;
   };
 
-
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -76,28 +90,11 @@ function App() {
     setIsSubmitting(true);
     setErrors({});
 
-    const url = isLogin ? 'http://localhost:5000/api/auth/login' : 'http://localhost:5000/api/auth/signup';
-    const payload = isLogin
-      ? { username: formData.username, password: formData.password }
-      : { username: formData.username, password: formData.password, confirmPassword: formData.confirmPassword };
-
     try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        setErrors({ general: errorData.message || 'An error occurred. Please try again later.' });
-        return;
-      }
-
-      const data = await response.json();
-      alert(isLogin ? 'Login successful!' : 'Account created successfully!');
+      // Simulating API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setIsAuthenticated(true);
+      setCurrentUser(isLogin ? formData.username : formData.name || formData.username);
     } catch (error) {
       setErrors({ general: 'An error occurred. Please try again later.' });
     } finally {
@@ -105,7 +102,18 @@ function App() {
     }
   };
 
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setCurrentUser('');
+    setFormData({ username: '', email: '', name: '', password: '', confirmPassword: '' });
+    setIsLogin(true);
+  };
+
   const passwordsMatch = formData.password && formData.confirmPassword && formData.password === formData.confirmPassword;
+
+  if (isAuthenticated) {
+    return <LandingPage username={currentUser} onLogout={handleLogout} />;
+  }
 
   return (
     <div className="flex min-h-screen">
@@ -145,13 +153,56 @@ function App() {
                 name="username"
                 value={formData.username}
                 onChange={handleChange}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${errors.username ? 'border-red-500' : 'border-gray-300'
-                  }`}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${
+                  errors.username ? 'border-red-500' : 'border-gray-300'
+                }`}
                 placeholder="Enter your username"
                 disabled={isSubmitting}
               />
               {errors.username && <p className="mt-1 text-sm text-red-500">{errors.username}</p>}
             </div>
+
+            {!isLogin && (
+              <>
+                <div>
+                  <label htmlFor="name" className="block mb-1 text-sm font-medium text-gray-700">
+                    Full name
+                  </label>
+                  <input
+                    type="text"
+                    id="name"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${
+                      errors.name ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="Enter your full name"
+                    disabled={isSubmitting}
+                  />
+                  {errors.name && <p className="mt-1 text-sm text-red-500">{errors.name}</p>}
+                </div>
+
+                <div>
+                  <label htmlFor="email" className="block mb-1 text-sm font-medium text-gray-700">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${
+                      errors.email ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="Enter your email"
+                    disabled={isSubmitting}
+                  />
+                  {errors.email && <p className="mt-1 text-sm text-red-500">{errors.email}</p>}
+                </div>
+              </>
+            )}
 
             <div>
               <label htmlFor="password" className="block mb-1 text-sm font-medium text-gray-700">
@@ -164,8 +215,9 @@ function App() {
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
-                  className={`w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${errors.password ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                  className={`w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${
+                    errors.password ? 'border-red-500' : 'border-gray-300'
+                  }`}
                   placeholder="••••••••"
                   disabled={isSubmitting}
                 />
@@ -221,8 +273,13 @@ function App() {
                     name="confirmPassword"
                     value={formData.confirmPassword}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${errors.confirmPassword ? 'border-red-500' : passwordsMatch ? 'border-green-500' : 'border-gray-300'
-                      }`}
+                    className={`w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${
+                      errors.confirmPassword 
+                        ? 'border-red-500' 
+                        : passwordsMatch && formData.confirmPassword 
+                          ? 'border-green-500' 
+                          : 'border-gray-300'
+                    }`}
                     placeholder="••••••••"
                     disabled={isSubmitting}
                   />
@@ -234,7 +291,7 @@ function App() {
                     >
                       {showConfirmPassword ? <Eye size={20} /> : <EyeOff size={20} />}
                     </button>
-                    {passwordsMatch && (
+                    {passwordsMatch && formData.confirmPassword && (
                       <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                       </svg>
@@ -261,7 +318,7 @@ function App() {
                 type="button"
                 onClick={() => {
                   setIsLogin(!isLogin);
-                  setFormData({ username: '', password: '', confirmPassword: '' });
+                  setFormData({ username: '', email: '', name: '', password: '', confirmPassword: '' });
                   setErrors({});
                 }}
                 className="font-semibold text-black hover:underline"
@@ -277,7 +334,7 @@ function App() {
       <div className="w-1/2 bg-[#F4F7FE] flex items-center justify-center p-8">
         <img
           src="https://img.freepik.com/free-photo/cricket-match-with-player_23-2151702173.jpg?t=st=1741422174~exp=1741425774~hmac=3d9db810c636c4d49e58114f0dcd8ab23f47865f71822e3b5d1c56eb4a7f118e&w=650"
-          alt="3D character illustration"
+          alt="Cricket player illustration"
           className="h-auto max-w-full shadow-2xl rounded-3xl"
         />
       </div>
