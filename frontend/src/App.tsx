@@ -43,11 +43,7 @@ function App() {
       newErrors.password = 'Password is required';
     }
 
-    if (isLogin) {
-      if (formData.username !== mockCredentials.username || formData.password !== mockCredentials.password) {
-        newErrors.general = 'Username or password is incorrect';
-      }
-    } else {
+    if (!isLogin) {
       if (formData.password.length < 8) {
         newErrors.password = 'Password must be at least 8 characters long';
       }
@@ -61,6 +57,8 @@ function App() {
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
+
+
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
