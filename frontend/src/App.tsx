@@ -78,8 +78,27 @@ function App() {
     setIsSubmitting(true);
     setErrors({});
 
+    const url = isLogin ? 'http://localhost:5000/api/auth/login' : 'http://localhost:5000/api/auth/signup';
+    const payload = isLogin
+      ? { username: formData.username, password: formData.password }
+      : { username: formData.username, password: formData.password, confirmPassword: formData.confirmPassword };
+
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        setErrors({ general: errorData.message || 'An error occurred. Please try again later.' });
+        return;
+      }
+
+      const data = await response.json();
       alert(isLogin ? 'Login successful!' : 'Account created successfully!');
     } catch (error) {
       setErrors({ general: 'An error occurred. Please try again later.' });
@@ -128,9 +147,8 @@ function App() {
                 name="username"
                 value={formData.username}
                 onChange={handleChange}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${
-                  errors.username ? 'border-red-500' : 'border-gray-300'
-                }`}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${errors.username ? 'border-red-500' : 'border-gray-300'
+                  }`}
                 placeholder="Enter your username"
                 disabled={isSubmitting}
               />
@@ -148,9 +166,8 @@ function App() {
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
-                  className={`w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${
-                    errors.password ? 'border-red-500' : 'border-gray-300'
-                  }`}
+                  className={`w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${errors.password ? 'border-red-500' : 'border-gray-300'
+                    }`}
                   placeholder="••••••••"
                   disabled={isSubmitting}
                 />
@@ -206,9 +223,8 @@ function App() {
                     name="confirmPassword"
                     value={formData.confirmPassword}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${
-                      errors.confirmPassword ? 'border-red-500' : passwordsMatch ? 'border-green-500' : 'border-gray-300'
-                    }`}
+                    className={`w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${errors.confirmPassword ? 'border-red-500' : passwordsMatch ? 'border-green-500' : 'border-gray-300'
+                      }`}
                     placeholder="••••••••"
                     disabled={isSubmitting}
                   />
