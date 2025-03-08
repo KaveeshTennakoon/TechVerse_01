@@ -3,15 +3,13 @@ import PasswordStrengthBar from 'react-password-strength-bar';
 import { Eye, EyeOff } from 'lucide-react';
 
 interface FormData {
-  name: string;
-  email: string;
+  username: string;
   password: string;
   confirmPassword: string;
 }
 
 interface FormErrors {
-  name?: string;
-  email?: string;
+  username?: string;
   password?: string;
   confirmPassword?: string;
   general?: string;
@@ -20,8 +18,7 @@ interface FormErrors {
 function App() {
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState<FormData>({
-    name: '',
-    email: '',
+    username: '',
     password: '',
     confirmPassword: '',
   });
@@ -31,33 +28,22 @@ function App() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const mockCredentials = {
-    email: 'test@example.com',
+    username: 'testuser',
     password: 'Test123!',
   };
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
 
-    if (!formData.email) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
+    if (!formData.username) {
+      newErrors.username = 'Username is required';
     }
 
     if (!formData.password) {
       newErrors.password = 'Password is required';
     }
 
-    if (isLogin) {
-    
-      if (formData.email !== mockCredentials.email || formData.password !== mockCredentials.password) {
-        newErrors.general = 'Email or password is incorrect';
-      }
-    } else {
-    
-      if (!formData.name) {
-        newErrors.name = 'Full name is required';
-      }
+    if (!isLogin) {
       if (formData.password.length < 8) {
         newErrors.password = 'Password must be at least 8 characters long';
       }
@@ -71,6 +57,8 @@ function App() {
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
+
+
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -88,8 +76,27 @@ function App() {
     setIsSubmitting(true);
     setErrors({});
 
+    const url = isLogin ? 'http://localhost:5000/api/auth/login' : 'http://localhost:5000/api/auth/signup';
+    const payload = isLogin
+      ? { username: formData.username, password: formData.password }
+      : { username: formData.username, password: formData.password, confirmPassword: formData.confirmPassword };
+
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        setErrors({ general: errorData.message || 'An error occurred. Please try again later.' });
+        return;
+      }
+
+      const data = await response.json();
       alert(isLogin ? 'Login successful!' : 'Account created successfully!');
     } catch (error) {
       setErrors({ general: 'An error occurred. Please try again later.' });
@@ -128,44 +135,22 @@ function App() {
               <div className="p-3 text-sm text-red-500 rounded-lg bg-red-50">{errors.general}</div>
             )}
 
-            {!isLogin && (
-              <div>
-                <label htmlFor="name" className="block mb-1 text-sm font-medium text-gray-700">
-                  Full name
-                </label>
-                <input
-                  type="text"
-                  id="name"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${
-                    errors.name ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                  placeholder="Enter your name"
-                  disabled={isSubmitting}
-                />
-                {errors.name && <p className="mt-1 text-sm text-red-500">{errors.name}</p>}
-              </div>
-            )}
-
             <div>
-              <label htmlFor="email" className="block mb-1 text-sm font-medium text-gray-700">
-                Email
+              <label htmlFor="username" className="block mb-1 text-sm font-medium text-gray-700">
+                Username
               </label>
               <input
-                type="email"
-                id="email"
-                name="email"
-                value={formData.email}
+                type="text"
+                id="username"
+                name="username"
+                value={formData.username}
                 onChange={handleChange}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${
-                  errors.email ? 'border-red-500' : 'border-gray-300'
-                }`}
-                placeholder="Enter your email"
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${errors.username ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                placeholder="Enter your username"
                 disabled={isSubmitting}
               />
-              {errors.email && <p className="mt-1 text-sm text-red-500">{errors.email}</p>}
+              {errors.username && <p className="mt-1 text-sm text-red-500">{errors.username}</p>}
             </div>
 
             <div>
@@ -179,9 +164,8 @@ function App() {
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
-                  className={`w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${
-                    errors.password ? 'border-red-500' : 'border-gray-300'
-                  }`}
+                  className={`w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${errors.password ? 'border-red-500' : 'border-gray-300'
+                    }`}
                   placeholder="••••••••"
                   disabled={isSubmitting}
                 />
@@ -237,9 +221,8 @@ function App() {
                     name="confirmPassword"
                     value={formData.confirmPassword}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${
-                      errors.confirmPassword ? 'border-red-500' : passwordsMatch ? 'border-green-500' : 'border-gray-300'
-                    }`}
+                    className={`w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${errors.confirmPassword ? 'border-red-500' : passwordsMatch ? 'border-green-500' : 'border-gray-300'
+                      }`}
                     placeholder="••••••••"
                     disabled={isSubmitting}
                   />
@@ -278,7 +261,7 @@ function App() {
                 type="button"
                 onClick={() => {
                   setIsLogin(!isLogin);
-                  setFormData({ name: '', email: '', password: '', confirmPassword: '' });
+                  setFormData({ username: '', password: '', confirmPassword: '' });
                   setErrors({});
                 }}
                 className="font-semibold text-black hover:underline"
