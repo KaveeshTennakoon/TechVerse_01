@@ -32,7 +32,7 @@ git clone https://github.com/KaveeshTennakoon/SpiritX_TechVerse1.git
 ### Navigate to the desired directory:
 
 ```bash
-cd TechVerse_01
+cd SpiritX_TechVerse1
 ```
 
 
