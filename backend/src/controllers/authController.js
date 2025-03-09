@@ -126,4 +126,21 @@ const loginUser = async (req, res) => {
   }
 };
 
-module.exports = { registerUser, checkUsername, loginUser };
+// @desc    Logout user / clear cookie
+// @route   POST /api/auth/logout
+// @access  Private
+const logoutUser = async (req, res) => {
+  try {
+    res.cookie('jwt', '', {
+      httpOnly: true,
+      expires: new Date(0),
+    });
+    
+    res.json({ message: 'Logged out successfully' });
+  } catch (error) {
+    console.error(`Error in logoutUser: ${error.message}`);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+module.exports = { registerUser, checkUsername, loginUser, logoutUser };

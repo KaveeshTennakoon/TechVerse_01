@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import PasswordStrengthBar from 'react-password-strength-bar';
 import { Eye, EyeOff } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface FormData {
   username: string;
@@ -26,30 +27,58 @@ function App() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [signupSuccess, setSignupSuccess] = useState(false);
+  const [formTouched, setFormTouched] = useState({
+    username: false,
+    password: false,
+    confirmPassword: false
+  });
 
-  const mockCredentials = {
-    username: 'testuser',
-    password: 'Test123!',
-  };
+  const navigate = useNavigate();
 
-  const validateForm = (): boolean => {
+  // Add validation on data change
+  useEffect(() => {
+    if (Object.values(formTouched).some(field => field)) {
+      validateForm(false);
+    }
+  }, [formData, isLogin]);
+
+  const validateForm = (isSubmission: boolean = true): boolean => {
     const newErrors: FormErrors = {};
 
-    if (!formData.username) {
+    // Only validate fields that have been touched or if this is a form submission
+    if ((formTouched.username || isSubmission) && !formData.username) {
       newErrors.username = 'Username is required';
+    } else if ((formTouched.username || isSubmission) && formData.username.length < 8) {
+      newErrors.username = 'Username must be at least 8 characters long';
     }
 
-    if (!formData.password) {
+    if ((formTouched.password || isSubmission) && !formData.password) {
       newErrors.password = 'Password is required';
     }
 
     if (!isLogin) {
-      if (formData.password.length < 8) {
+      if ((formTouched.password || isSubmission) && formData.password.length < 8) {
         newErrors.password = 'Password must be at least 8 characters long';
       }
-      if (!formData.confirmPassword) {
+      
+      // Validate password complexity
+      const passwordRegex = {
+        lowercase: /[a-z]/,
+        uppercase: /[A-Z]/,
+        special: /[!@#$%^&*(),.?":{}|<>]/,
+      };
+      
+      if ((formTouched.password || isSubmission) && 
+          (!passwordRegex.lowercase.test(formData.password) || 
+          !passwordRegex.uppercase.test(formData.password) || 
+          !passwordRegex.special.test(formData.password))) {
+        newErrors.password = 'Password must include lowercase, uppercase, and special characters';
+      }
+      
+      if ((formTouched.confirmPassword || isSubmission) && !formData.confirmPassword) {
         newErrors.confirmPassword = 'Please confirm your password';
-      } else if (formData.password !== formData.confirmPassword) {
+      } else if ((formTouched.confirmPassword || isSubmission) && formData.password !== formData.confirmPassword) {
         newErrors.confirmPassword = 'Passwords do not match';
       }
     }
@@ -58,38 +87,57 @@ function App() {
     return Object.keys(newErrors).length === 0;
   };
 
-
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    if (errors[name as keyof FormErrors]) {
-      setErrors(prev => ({ ...prev, [name]: undefined }));
+    
+    // Mark field as touched when user enters something
+    if (!formTouched[name as keyof typeof formTouched]) {
+      setFormTouched(prev => ({ ...prev, [name]: true }));
     }
+    
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleBlur = (name: string) => {
+    setFormTouched(prev => ({ ...prev, [name]: true }));
+    validateForm(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validateForm()) return;
+    // Mark all fields as touched
+    setFormTouched({
+      username: true,
+      password: true,
+      confirmPassword: true
+    });
+
+    if (!validateForm(true)) return;
 
     setIsSubmitting(true);
     setErrors({});
+    setSignupSuccess(false);
 
     const url = isLogin ? 'http://localhost:5000/api/auth/login' : 'http://localhost:5000/api/auth/signup';
     const payload = isLogin
       ? { username: formData.username, password: formData.password }
-      : { username: formData.username, password: formData.password, confirmPassword: formData.confirmPassword };
+      : { username: formData.username, password: formData.password };
 
     try {
+      console.log(`Submitting to ${url} with payload:`, { ...payload, password: '[REDACTED]' });
+      
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
+        credentials: 'include', // Important for cookies
       });
 
+      console.log('Response status:', response.status);
+      
       if (!response.ok) {
         const errorData = await response.json();
         setErrors({ general: errorData.message || 'An error occurred. Please try again later.' });
@@ -97,15 +145,48 @@ function App() {
       }
 
       const data = await response.json();
-      alert(isLogin ? 'Login successful!' : 'Account created successfully!');
+      console.log('Response data:', data);
+
+      if (isLogin) {
+        // Store auth data
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify({
+          id: data.id,
+          username: data.username
+        }));
+        
+        // Navigate to dashboard
+        navigate('/landing');
+      } else {
+        // Show success message
+        setSignupSuccess(true);
+        
+        // Redirect to login after 2 seconds
+        setTimeout(() => {
+          setSignupSuccess(false);
+          setIsLogin(true);
+          setFormData({
+            username: formData.username, // Keep the username for convenience
+            password: '',
+            confirmPassword: ''
+          });
+          setFormTouched({
+            username: false,
+            password: false,
+            confirmPassword: false
+          });
+        }, 2000);
+      }
     } catch (error) {
-      setErrors({ general: 'An error occurred. Please try again later.' });
+      console.error('Authentication error:', error);
+      setErrors({ general: 'An error occurred. Please check your connection and try again.' });
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const passwordsMatch = formData.password && formData.confirmPassword && formData.password === formData.confirmPassword;
+  const usernameValid = formData.username.length >= 8;
 
   return (
     <div className="flex min-h-screen">
@@ -135,6 +216,12 @@ function App() {
               <div className="p-3 text-sm text-red-500 rounded-lg bg-red-50">{errors.general}</div>
             )}
 
+            {signupSuccess && (
+              <div className="p-3 text-sm text-green-500 rounded-lg bg-green-50">
+                Account created successfully! Redirecting to login...
+              </div>
+            )}
+
             <div>
               <label htmlFor="username" className="block mb-1 text-sm font-medium text-gray-700">
                 Username
@@ -145,12 +232,22 @@ function App() {
                 name="username"
                 value={formData.username}
                 onChange={handleChange}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${errors.username ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                placeholder="Enter your username"
+                onBlur={() => handleBlur('username')}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${
+                  errors.username ? 'border-red-500' : formTouched.username && usernameValid ? 'border-green-500' : 'border-gray-300'
+                }`}
+                placeholder="Enter your username (min 8 characters)"
                 disabled={isSubmitting}
               />
               {errors.username && <p className="mt-1 text-sm text-red-500">{errors.username}</p>}
+              {!errors.username && formTouched.username && (
+                <div className="mt-2 space-y-2 text-sm">
+                  <p className={`flex items-center ${usernameValid ? 'text-green-500' : 'text-gray-500'}`}>
+                    <span className="mr-2">{usernameValid ? '✓' : '○'}</span>
+                    At least 8 characters long
+                  </p>
+                </div>
+              )}
             </div>
 
             <div>
@@ -164,8 +261,10 @@ function App() {
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
-                  className={`w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${errors.password ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                  onBlur={() => handleBlur('password')}
+                  className={`w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${
+                    errors.password ? 'border-red-500' : formTouched.password && formData.password && (!isLogin || formData.password.length >= 8) ? 'border-green-500' : 'border-gray-300'
+                  }`}
                   placeholder="••••••••"
                   disabled={isSubmitting}
                 />
@@ -221,8 +320,10 @@ function App() {
                     name="confirmPassword"
                     value={formData.confirmPassword}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${errors.confirmPassword ? 'border-red-500' : passwordsMatch ? 'border-green-500' : 'border-gray-300'
-                      }`}
+                    onBlur={() => handleBlur('confirmPassword')}
+                    className={`w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${
+                      errors.confirmPassword ? 'border-red-500' : passwordsMatch ? 'border-green-500' : 'border-gray-300'
+                    }`}
                     placeholder="••••••••"
                     disabled={isSubmitting}
                   />
@@ -263,6 +364,11 @@ function App() {
                   setIsLogin(!isLogin);
                   setFormData({ username: '', password: '', confirmPassword: '' });
                   setErrors({});
+                  setFormTouched({
+                    username: false,
+                    password: false,
+                    confirmPassword: false
+                  });
                 }}
                 className="font-semibold text-black hover:underline"
                 disabled={isSubmitting}
@@ -271,16 +377,43 @@ function App() {
               </button>
             </p>
           </div>
+          
+          
         </div>
       </div>
 
       <div className="w-1/2 bg-[#F4F7FE] flex items-center justify-center p-8">
         <img
           src="https://img.freepik.com/free-photo/cricket-match-with-player_23-2151702173.jpg?t=st=1741422174~exp=1741425774~hmac=3d9db810c636c4d49e58114f0dcd8ab23f47865f71822e3b5d1c56eb4a7f118e&w=650"
-          alt="3D character illustration"
+          alt="Cricket match"
           className="h-auto max-w-full shadow-2xl rounded-3xl"
         />
       </div>
+
+      {/* Success Modal for Signup */}
+      {signupSuccess && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
+            <div className="text-center">
+              <svg 
+                className="mx-auto h-12 w-12 text-green-500" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24" 
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  strokeWidth="2" 
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+              <h3 className="mt-2 text-xl font-medium text-gray-900">Account created successfully!</h3>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
