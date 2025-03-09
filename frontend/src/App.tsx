@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import PasswordStrengthBar from 'react-password-strength-bar';
 import { Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -28,22 +28,37 @@ function App() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [signupSuccess, setSignupSuccess] = useState(false);
+  const [formTouched, setFormTouched] = useState({
+    username: false,
+    password: false,
+    confirmPassword: false
+  });
 
   const navigate = useNavigate();
 
-  const validateForm = (): boolean => {
+  // Add validation on data change
+  useEffect(() => {
+    if (Object.values(formTouched).some(field => field)) {
+      validateForm(false);
+    }
+  }, [formData, isLogin]);
+
+  const validateForm = (isSubmission: boolean = true): boolean => {
     const newErrors: FormErrors = {};
 
-    if (!formData.username) {
+    // Only validate fields that have been touched or if this is a form submission
+    if ((formTouched.username || isSubmission) && !formData.username) {
       newErrors.username = 'Username is required';
+    } else if ((formTouched.username || isSubmission) && formData.username.length < 8) {
+      newErrors.username = 'Username must be at least 8 characters long';
     }
 
-    if (!formData.password) {
+    if ((formTouched.password || isSubmission) && !formData.password) {
       newErrors.password = 'Password is required';
     }
 
     if (!isLogin) {
-      if (formData.password.length < 8) {
+      if ((formTouched.password || isSubmission) && formData.password.length < 8) {
         newErrors.password = 'Password must be at least 8 characters long';
       }
       
@@ -54,15 +69,16 @@ function App() {
         special: /[!@#$%^&*(),.?":{}|<>]/,
       };
       
-      if (!passwordRegex.lowercase.test(formData.password) || 
+      if ((formTouched.password || isSubmission) && 
+          (!passwordRegex.lowercase.test(formData.password) || 
           !passwordRegex.uppercase.test(formData.password) || 
-          !passwordRegex.special.test(formData.password)) {
+          !passwordRegex.special.test(formData.password))) {
         newErrors.password = 'Password must include lowercase, uppercase, and special characters';
       }
       
-      if (!formData.confirmPassword) {
+      if ((formTouched.confirmPassword || isSubmission) && !formData.confirmPassword) {
         newErrors.confirmPassword = 'Please confirm your password';
-      } else if (formData.password !== formData.confirmPassword) {
+      } else if ((formTouched.confirmPassword || isSubmission) && formData.password !== formData.confirmPassword) {
         newErrors.confirmPassword = 'Passwords do not match';
       }
     }
@@ -73,16 +89,31 @@ function App() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    if (errors[name as keyof FormErrors]) {
-      setErrors(prev => ({ ...prev, [name]: undefined }));
+    
+    // Mark field as touched when user enters something
+    if (!formTouched[name as keyof typeof formTouched]) {
+      setFormTouched(prev => ({ ...prev, [name]: true }));
     }
+    
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleBlur = (name: string) => {
+    setFormTouched(prev => ({ ...prev, [name]: true }));
+    validateForm(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validateForm()) return;
+    // Mark all fields as touched
+    setFormTouched({
+      username: true,
+      password: true,
+      confirmPassword: true
+    });
+
+    if (!validateForm(true)) return;
 
     setIsSubmitting(true);
     setErrors({});
@@ -139,6 +170,11 @@ function App() {
             password: '',
             confirmPassword: ''
           });
+          setFormTouched({
+            username: false,
+            password: false,
+            confirmPassword: false
+          });
         }, 2000);
       }
     } catch (error) {
@@ -150,6 +186,7 @@ function App() {
   };
 
   const passwordsMatch = formData.password && formData.confirmPassword && formData.password === formData.confirmPassword;
+  const usernameValid = formData.username.length >= 8;
 
   return (
     <div className="flex min-h-screen">
@@ -195,13 +232,22 @@ function App() {
                 name="username"
                 value={formData.username}
                 onChange={handleChange}
+                onBlur={() => handleBlur('username')}
                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${
-                  errors.username ? 'border-red-500' : 'border-gray-300'
+                  errors.username ? 'border-red-500' : formTouched.username && usernameValid ? 'border-green-500' : 'border-gray-300'
                 }`}
-                placeholder="Enter your username"
+                placeholder="Enter your username (min 8 characters)"
                 disabled={isSubmitting}
               />
               {errors.username && <p className="mt-1 text-sm text-red-500">{errors.username}</p>}
+              {!errors.username && formTouched.username && (
+                <div className="mt-2 space-y-2 text-sm">
+                  <p className={`flex items-center ${usernameValid ? 'text-green-500' : 'text-gray-500'}`}>
+                    <span className="mr-2">{usernameValid ? '✓' : '○'}</span>
+                    At least 8 characters long
+                  </p>
+                </div>
+              )}
             </div>
 
             <div>
@@ -215,8 +261,9 @@ function App() {
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
+                  onBlur={() => handleBlur('password')}
                   className={`w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${
-                    errors.password ? 'border-red-500' : 'border-gray-300'
+                    errors.password ? 'border-red-500' : formTouched.password && formData.password && (!isLogin || formData.password.length >= 8) ? 'border-green-500' : 'border-gray-300'
                   }`}
                   placeholder="••••••••"
                   disabled={isSubmitting}
@@ -273,6 +320,7 @@ function App() {
                     name="confirmPassword"
                     value={formData.confirmPassword}
                     onChange={handleChange}
+                    onBlur={() => handleBlur('confirmPassword')}
                     className={`w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${
                       errors.confirmPassword ? 'border-red-500' : passwordsMatch ? 'border-green-500' : 'border-gray-300'
                     }`}
@@ -316,6 +364,11 @@ function App() {
                   setIsLogin(!isLogin);
                   setFormData({ username: '', password: '', confirmPassword: '' });
                   setErrors({});
+                  setFormTouched({
+                    username: false,
+                    password: false,
+                    confirmPassword: false
+                  });
                 }}
                 className="font-semibold text-black hover:underline"
                 disabled={isSubmitting}
@@ -357,9 +410,6 @@ function App() {
                 />
               </svg>
               <h3 className="mt-2 text-xl font-medium text-gray-900">Account created successfully!</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                Redirecting you to login in 2 seconds...
-              </p>
             </div>
           </div>
         </div>
