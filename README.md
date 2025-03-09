@@ -25,23 +25,26 @@ To get started with this project:
 
 ### Clone the repository:
 
-bash
+```bash
 git clone https://github.com/KaveeshTennakoon/SpiritX_TechVerse1.git
-
+```
 
 ### Navigate to the desired directory:
 
-bash
+```bash
 cd TechVerse_01
+```
 
 
 ### Install dependencies:
 
-bash
+```bash
 npm install
+```
 
 
 ### Run the application:
 
 ```bash
 npm run dev
+```
