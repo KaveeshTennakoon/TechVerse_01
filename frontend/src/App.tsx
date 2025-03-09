@@ -68,6 +68,8 @@ function App() {
     }
   };
 
+  const [signupSuccess, setSignupSuccess] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -75,6 +77,7 @@ function App() {
 
     setIsSubmitting(true);
     setErrors({});
+    setSignupSuccess(false);
 
     const url = isLogin ? 'http://localhost:5000/api/auth/login' : 'http://localhost:5000/api/auth/signup';
     const payload = isLogin
@@ -96,14 +99,24 @@ function App() {
         return;
       }
 
-      const data = await response.json();
-      alert(isLogin ? 'Login successful!' : 'Account created successfully!');
+      if (!isLogin) {
+        setSignupSuccess(true);
+        setTimeout(() => {
+          setIsLogin(true);
+          setFormData({ username: '', password: '', confirmPassword: '' });
+          setErrors({});
+          setSignupSuccess(false);
+        }, 2000);
+      } else {
+        alert('Login successful!');
+      }
     } catch (error) {
       setErrors({ general: 'An error occurred. Please try again later.' });
     } finally {
       setIsSubmitting(false);
     }
   };
+
 
   const passwordsMatch = formData.password && formData.confirmPassword && formData.password === formData.confirmPassword;
 
@@ -133,6 +146,12 @@ function App() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {errors.general && (
               <div className="p-3 text-sm text-red-500 rounded-lg bg-red-50">{errors.general}</div>
+            )}
+
+            {signupSuccess && (
+              <div className="p-3 text-sm text-green-500 rounded-lg bg-green-50">
+                Account created successfully! Redirecting to login...
+              </div>
             )}
 
             <div>
