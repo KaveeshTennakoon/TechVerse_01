@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import PasswordStrengthBar from 'react-password-strength-bar';
 import { Eye, EyeOff } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface FormData {
   username: string;
@@ -26,11 +27,9 @@ function App() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [signupSuccess, setSignupSuccess] = useState(false);
 
-  const mockCredentials = {
-    username: 'testuser',
-    password: 'Test123!',
-  };
+  const navigate = useNavigate();
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
@@ -47,6 +46,20 @@ function App() {
       if (formData.password.length < 8) {
         newErrors.password = 'Password must be at least 8 characters long';
       }
+      
+      // Validate password complexity
+      const passwordRegex = {
+        lowercase: /[a-z]/,
+        uppercase: /[A-Z]/,
+        special: /[!@#$%^&*(),.?":{}|<>]/,
+      };
+      
+      if (!passwordRegex.lowercase.test(formData.password) || 
+          !passwordRegex.uppercase.test(formData.password) || 
+          !passwordRegex.special.test(formData.password)) {
+        newErrors.password = 'Password must include lowercase, uppercase, and special characters';
+      }
+      
       if (!formData.confirmPassword) {
         newErrors.confirmPassword = 'Please confirm your password';
       } else if (formData.password !== formData.confirmPassword) {
@@ -58,8 +71,6 @@ function App() {
     return Object.keys(newErrors).length === 0;
   };
 
-
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -67,8 +78,6 @@ function App() {
       setErrors(prev => ({ ...prev, [name]: undefined }));
     }
   };
-
-  const [signupSuccess, setSignupSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,41 +91,63 @@ function App() {
     const url = isLogin ? 'http://localhost:5000/api/auth/login' : 'http://localhost:5000/api/auth/signup';
     const payload = isLogin
       ? { username: formData.username, password: formData.password }
-      : { username: formData.username, password: formData.password, confirmPassword: formData.confirmPassword };
+      : { username: formData.username, password: formData.password };
 
     try {
+      console.log(`Submitting to ${url} with payload:`, { ...payload, password: '[REDACTED]' });
+      
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
+        credentials: 'include', // Important for cookies
       });
 
+      console.log('Response status:', response.status);
+      
       if (!response.ok) {
         const errorData = await response.json();
         setErrors({ general: errorData.message || 'An error occurred. Please try again later.' });
         return;
       }
 
-      if (!isLogin) {
-        setSignupSuccess(true);
-        setTimeout(() => {
-          setIsLogin(true);
-          setFormData({ username: '', password: '', confirmPassword: '' });
-          setErrors({});
-          setSignupSuccess(false);
-        }, 2000);
+      const data = await response.json();
+      console.log('Response data:', data);
+
+      if (isLogin) {
+        // Store auth data
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify({
+          id: data.id,
+          username: data.username
+        }));
+        
+        // Navigate to dashboard
+        navigate('/landing');
       } else {
-        alert('Login successful!');
+        // Show success message
+        setSignupSuccess(true);
+        
+        // Redirect to login after 2 seconds
+        setTimeout(() => {
+          setSignupSuccess(false);
+          setIsLogin(true);
+          setFormData({
+            username: formData.username, // Keep the username for convenience
+            password: '',
+            confirmPassword: ''
+          });
+        }, 2000);
       }
     } catch (error) {
-      setErrors({ general: 'An error occurred. Please try again later.' });
+      console.error('Authentication error:', error);
+      setErrors({ general: 'An error occurred. Please check your connection and try again.' });
     } finally {
       setIsSubmitting(false);
     }
   };
-
 
   const passwordsMatch = formData.password && formData.confirmPassword && formData.password === formData.confirmPassword;
 
@@ -164,8 +195,9 @@ function App() {
                 name="username"
                 value={formData.username}
                 onChange={handleChange}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${errors.username ? 'border-red-500' : 'border-gray-300'
-                  }`}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${
+                  errors.username ? 'border-red-500' : 'border-gray-300'
+                }`}
                 placeholder="Enter your username"
                 disabled={isSubmitting}
               />
@@ -183,8 +215,9 @@ function App() {
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
-                  className={`w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${errors.password ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                  className={`w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${
+                    errors.password ? 'border-red-500' : 'border-gray-300'
+                  }`}
                   placeholder="••••••••"
                   disabled={isSubmitting}
                 />
@@ -240,8 +273,9 @@ function App() {
                     name="confirmPassword"
                     value={formData.confirmPassword}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${errors.confirmPassword ? 'border-red-500' : passwordsMatch ? 'border-green-500' : 'border-gray-300'
-                      }`}
+                    className={`w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-black/5 focus:border-black ${
+                      errors.confirmPassword ? 'border-red-500' : passwordsMatch ? 'border-green-500' : 'border-gray-300'
+                    }`}
                     placeholder="••••••••"
                     disabled={isSubmitting}
                   />
@@ -290,16 +324,46 @@ function App() {
               </button>
             </p>
           </div>
+          
+          
         </div>
       </div>
 
       <div className="w-1/2 bg-[#F4F7FE] flex items-center justify-center p-8">
         <img
           src="https://img.freepik.com/free-photo/cricket-match-with-player_23-2151702173.jpg?t=st=1741422174~exp=1741425774~hmac=3d9db810c636c4d49e58114f0dcd8ab23f47865f71822e3b5d1c56eb4a7f118e&w=650"
-          alt="3D character illustration"
+          alt="Cricket match"
           className="h-auto max-w-full shadow-2xl rounded-3xl"
         />
       </div>
+
+      {/* Success Modal for Signup */}
+      {signupSuccess && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
+            <div className="text-center">
+              <svg 
+                className="mx-auto h-12 w-12 text-green-500" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24" 
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  strokeWidth="2" 
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+              <h3 className="mt-2 text-xl font-medium text-gray-900">Account created successfully!</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                Redirecting you to login in 2 seconds...
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
